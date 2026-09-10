@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import * as maplibregl from "maplibre-gl";
-import MapboxDraw from "maplibre-gl-draw";
 import {
   Button,
   Card,
@@ -12,6 +10,9 @@ import {
   Spinner,
 } from "@heroui/react";
 import { motion } from "framer-motion";
+
+type MapLibreMap = import("maplibre-gl").Map;
+type MapLibreDraw = import("maplibre-gl-draw");
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -45,8 +46,8 @@ const UTD_CENTER: [number, number] = [-96.75, 32.985];
 
 export default function Home() {
   const mapEl = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<maplibregl.Map | null>(null);
-  const drawRef = useRef<MapboxDraw | null>(null);
+  const mapRef = useRef<MapLibreMap | null>(null);
+  const drawRef = useRef<MapLibreDraw | null>(null);
   const [selectedPolygon, setSelectedPolygon] = useState<GeoJSONPolygon | null>(null);
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -97,54 +98,63 @@ export default function Home() {
   };
 
   useEffect(() => {
-    if (!mapEl.current || mapRef.current) return;
+    let mounted = true;
 
-    const map = new maplibregl.Map({
-      container: mapEl.current,
-      style: {
-        version: 8,
-        sources: {
-          satellite: {
-            type: "raster",
-            tiles: [
-              "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-            ],
-            tileSize: 256,
-            attribution: "Esri World Imagery",
+    const init = async () => {
+      const maplibregl = await import("maplibre-gl");
+      const { default: MapboxDraw } = await import("maplibre-gl-draw");
+      if (!mounted || !mapEl.current || mapRef.current) return;
+
+      const map = new maplibregl.Map({
+        container: mapEl.current,
+        style: {
+          version: 8,
+          sources: {
+            satellite: {
+              type: "raster",
+              tiles: [
+                "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+              ],
+              tileSize: 256,
+              attribution: "Esri World Imagery",
+            },
           },
+          layers: [
+            { id: "satellite", type: "raster", source: "satellite" },
+          ],
         },
-        layers: [
-          { id: "satellite", type: "raster", source: "satellite" },
-        ],
-      },
-      center: UTD_CENTER,
-      zoom: 16,
-    });
-    mapRef.current = map;
+        center: UTD_CENTER,
+        zoom: 16,
+      });
+      mapRef.current = map;
 
-    const draw = new MapboxDraw({
-      displayControlsDefault: false,
-      controls: { polygon: true, trash: true },
-      defaultMode: "draw_polygon",
-    });
-    drawRef.current = draw;
-    map.addControl(draw as unknown as maplibregl.IControl, "top-left");
+      const draw = new MapboxDraw({
+        displayControlsDefault: false,
+        controls: { polygon: true, trash: true },
+        defaultMode: "draw_polygon",
+      });
+      drawRef.current = draw;
+      map.addControl(draw as unknown as import("maplibre-gl").IControl, "top-left");
 
-    const syncPolygon = () => {
-      const feats = draw.getAll();
-      const poly = feats.features.find((f) => f.geometry.type === "Polygon");
-      setSelectedPolygon(poly ? (poly.geometry as GeoJSONPolygon) : null);
+      const syncPolygon = () => {
+        const feats = draw.getAll();
+        const poly = feats.features.find((f) => f.geometry.type === "Polygon");
+        setSelectedPolygon(poly ? (poly.geometry as GeoJSONPolygon) : null);
+      };
+
+      (map as any).on("draw.create", syncPolygon);
+      (map as any).on("draw.update", syncPolygon);
+      (map as any).on("draw.delete", () => {
+        setSelectedPolygon(null);
+        clearSpots();
+      });
     };
 
-    (map as any).on("draw.create", syncPolygon);
-    (map as any).on("draw.update", syncPolygon);
-    (map as any).on("draw.delete", () => {
-      setSelectedPolygon(null);
-      clearSpots();
-    });
+    init();
 
     return () => {
-      map.remove();
+      mounted = false;
+      mapRef.current?.remove();
       mapRef.current = null;
       drawRef.current = null;
     };
