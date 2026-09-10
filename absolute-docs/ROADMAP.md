@@ -10,3 +10,8 @@
 8. **Render overlay** — MapLibre consumes GeoJSON and colors spaces.
 9. **Provider swap** — replace `StaticTestProvider` with Planet archive, then Planet tasking.
 10. **Optimization** — add SAM 2 for tight masks, TiTiler for large rasters, caching, async jobs.
+
+## Post-MVP
+
+- **Spot-level directions** — when a user selects a free space, show a "Get directions" button that deep-links to Google/Apple Maps with the spot's lat/lon as the destination. In-app routing can be added later with OSRM/Valhalla/Mapbox Directions.
+- **Fastest route to spot** — compute and render a route from the user's location to the selected free space.
