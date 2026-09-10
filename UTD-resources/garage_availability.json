@@ -1,0 +1,121 @@
+{
+  "source_url": "https://services.utdallas.edu/transit/garages/_code.php/",
+  "last_checked_times": [
+    "6:08:21 p.m.",
+    "6:08:22 p.m.",
+    "6:08:22 p.m."
+  ],
+  "garages": {
+    "PS1": [
+      {
+        "level": 5,
+        "option": "Gold Permit",
+        "available_spaces": 0
+      },
+      {
+        "level": 5,
+        "option": "Orange Permit",
+        "available_spaces": 0
+      },
+      {
+        "level": 4,
+        "option": "Orange Permit",
+        "available_spaces": 60
+      },
+      {
+        "level": 3,
+        "option": "Orange Permit",
+        "available_spaces": 42
+      },
+      {
+        "level": 2,
+        "option": "Pay-By-Space",
+        "available_spaces": 5
+      },
+      {
+        "level": 2,
+        "option": "Purple Permit",
+        "available_spaces": 95
+      },
+      {
+        "level": 1,
+        "option": "Pay-By-Space",
+        "available_spaces": 15
+      }
+    ],
+    "PS3": [
+      {
+        "level": 5,
+        "option": "Gold Permit",
+        "available_spaces": 103
+      },
+      {
+        "level": 4,
+        "option": "Gold Permit",
+        "available_spaces": 57
+      },
+      {
+        "level": 3,
+        "option": "Orange Permit",
+        "available_spaces": 102
+      },
+      {
+        "level": 2,
+        "option": "Orange Permit",
+        "available_spaces": 13
+      },
+      {
+        "level": 2,
+        "option": "Purple Permit",
+        "available_spaces": 22
+      },
+      {
+        "level": 1,
+        "option": "Purple Permit",
+        "available_spaces": 26
+      },
+      {
+        "level": 1,
+        "option": "Pay-By-Space",
+        "available_spaces": 17
+      }
+    ],
+    "PS4": [
+      {
+        "level": 5,
+        "option": "Gold Permit",
+        "available_spaces": 0
+      },
+      {
+        "level": 4,
+        "option": "Gold Permit",
+        "available_spaces": 86
+      },
+      {
+        "level": 3,
+        "option": "Orange Permit",
+        "available_spaces": 130
+      },
+      {
+        "level": 2,
+        "option": "Orange Permit",
+        "available_spaces": 103
+      },
+      {
+        "level": 2,
+        "option": "Purple Permit",
+        "available_spaces": 19
+      },
+      {
+        "level": 1,
+        "option": "Purple Permit",
+        "available_spaces": 9
+      },
+      {
+        "level": 1,
+        "option": "Pay-By-Space",
+        "available_spaces": 90
+      }
+    ]
+  }
+}
