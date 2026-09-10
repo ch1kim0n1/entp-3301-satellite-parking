@@ -101,53 +101,59 @@ export default function Home() {
     let mounted = true;
 
     const init = async () => {
-      const maplibregl = await import("maplibre-gl");
-      const { default: MapboxDraw } = await import("maplibre-gl-draw");
-      if (!mounted || !mapEl.current || mapRef.current) return;
+      try {
+        const maplibregl = await import("maplibre-gl");
+        const { default: MapboxDraw } = await import("maplibre-gl-draw");
+        if (!mounted || !mapEl.current || mapRef.current) return;
 
-      const map = new maplibregl.Map({
-        container: mapEl.current,
-        style: {
-          version: 8,
-          sources: {
-            satellite: {
-              type: "raster",
-              tiles: [
-                "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-              ],
-              tileSize: 256,
-              attribution: "Esri World Imagery",
+        const map = new maplibregl.Map({
+          container: mapEl.current,
+          style: {
+            version: 8,
+            sources: {
+              satellite: {
+                type: "raster",
+                tiles: [
+                  "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+                ],
+                tileSize: 256,
+                attribution: "Esri World Imagery",
+              },
             },
+            layers: [
+              { id: "satellite", type: "raster", source: "satellite" },
+            ],
           },
-          layers: [
-            { id: "satellite", type: "raster", source: "satellite" },
-          ],
-        },
-        center: UTD_CENTER,
-        zoom: 16,
-      });
-      mapRef.current = map;
+          center: UTD_CENTER,
+          zoom: 16,
+        });
+        map.on("error", (e) => console.error("map error", e));
+        mapRef.current = map;
 
-      const draw = new MapboxDraw({
-        displayControlsDefault: false,
-        controls: { polygon: true, trash: true },
-        defaultMode: "draw_polygon",
-      });
-      drawRef.current = draw;
-      map.addControl(draw as unknown as import("maplibre-gl").IControl, "top-left");
+        const draw = new MapboxDraw({
+          displayControlsDefault: false,
+          controls: { polygon: true, trash: true },
+          defaultMode: "draw_polygon",
+        });
+        drawRef.current = draw;
+        map.addControl(draw as unknown as import("maplibre-gl").IControl, "top-left");
 
-      const syncPolygon = () => {
-        const feats = draw.getAll();
-        const poly = feats.features.find((f) => f.geometry.type === "Polygon");
-        setSelectedPolygon(poly ? (poly.geometry as GeoJSONPolygon) : null);
-      };
+        const syncPolygon = () => {
+          const feats = draw.getAll();
+          const poly = feats.features.find((f) => f.geometry.type === "Polygon");
+          setSelectedPolygon(poly ? (poly.geometry as GeoJSONPolygon) : null);
+        };
 
-      (map as any).on("draw.create", syncPolygon);
-      (map as any).on("draw.update", syncPolygon);
-      (map as any).on("draw.delete", () => {
-        setSelectedPolygon(null);
-        clearSpots();
-      });
+        (map as any).on("draw.create", syncPolygon);
+        (map as any).on("draw.update", syncPolygon);
+        (map as any).on("draw.delete", () => {
+          setSelectedPolygon(null);
+          clearSpots();
+        });
+      } catch (err) {
+        console.error("map init failed", err);
+        setError(err instanceof Error ? err.message : "Map init failed");
+      }
     };
 
     init();
@@ -193,7 +199,7 @@ export default function Home() {
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-black">
-      <div ref={mapEl} className="absolute inset-0" />
+      <div ref={mapEl} className="h-full w-full" />
 
       <motion.div
         initial={{ opacity: 0, y: -12 }}
