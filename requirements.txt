@@ -1,0 +1,13 @@
+fastapi>=0.100
+uvicorn[standard]>=0.23
+python-multipart
+pydantic>=2
+requests
+rasterio
+geopandas
+shapely
+osmnx
+Pillow
+opencv-python-headless
+transformers>=4.44
+torch
