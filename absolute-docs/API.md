@@ -26,8 +26,11 @@ Response:
 
 ```json
 {
-  "capture_time": "2026-09-10T20:30:00Z",
-  "image_id": "static_lot_001",
+  "capture_time": null,
+  "analyzed_at": "2026-09-10T20:30:00Z",
+  "image_id": "utd_naip_plus_historic",
+  "imagery_source": "Bundled USGS NAIP aerial GeoTIFF",
+  "imagery_is_current": false,
   "spots": [
     {
       "id": "A101",
@@ -50,6 +53,8 @@ Response:
   ]
 }
 ```
+
+`capture_time` is `null` when the image's acquisition date is unavailable. `analyzed_at` records when the server performed the analysis. The bundled NAIP image is historical, so `imagery_is_current` is `false`.
 
 ## GeoJSON FeatureCollection output
 

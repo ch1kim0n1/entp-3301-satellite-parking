@@ -4,8 +4,8 @@
 @import "maplibre-gl-draw/dist/mapbox-gl-draw.css";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #020617;
+  --foreground: #e2e8f0;
 }
 
 @theme inline {
@@ -15,15 +15,65 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: rgb(34 211 238 / 0.35);
+  color: #f8fafc;
+}
+
+.maplibregl-ctrl-top-right {
+  top: 1rem;
+  right: 1rem;
+}
+
+.maplibregl-ctrl-top-left,
+.maplibregl-ctrl-top-right,
+.maplibregl-ctrl-bottom-left,
+.maplibregl-ctrl-bottom-right {
+  z-index: 6 !important;
+}
+
+.mapbox-gl-draw_ctrl-top-left {
+  top: 1.5rem;
+  left: calc(min(360px, calc(100vw - 3rem)) + 2rem);
+}
+
+@media (max-width: 520px) {
+  .mapbox-gl-draw_ctrl-top-left {
+    top: auto;
+    bottom: 4.5rem;
+    left: 1rem;
+  }
+}
+
+.maplibregl-ctrl-group {
+  overflow: hidden;
+  border: 1px solid rgb(51 65 85) !important;
+  border-radius: 0.375rem !important;
+  background: rgb(15 23 42) !important;
+  box-shadow: 0 6px 14px rgb(2 6 23 / 0.28) !important;
+}
+
+.maplibregl-ctrl-group button {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-color: rgb(51 65 85) !important;
+  filter: invert(1) brightness(1.8);
+}
+
+.maplibregl-ctrl-attrib {
+  border-radius: 0.25rem 0 0 0 !important;
+  background: rgb(15 23 42) !important;
+  color: rgb(203 213 225 / 0.8) !important;
+  font-size: 10px !important;
+}
+
+.maplibregl-ctrl-attrib a {
+  color: rgb(103 232 249) !important;
 }

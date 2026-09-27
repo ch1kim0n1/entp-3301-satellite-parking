@@ -4,12 +4,15 @@
 
 ```bash
 # Create and activate a virtualenv (Python 3.11 recommended)
-python3.11 -m venv .venv
-source .venv/bin/activate
+python -m venv .venv
+# Windows PowerShell:
+.\.venv\Scripts\Activate.ps1
+# macOS/Linux:
+# source .venv/bin/activate
 pip install -r requirements.txt
 
 # Run FastAPI
-PYTHONPATH=. uvicorn backend.main:app --host 0.0.0.0 --port 8000
+python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
 ```
 
 ### Useful env vars
