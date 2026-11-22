@@ -26,9 +26,27 @@ Results of the November 19 MVP demonstration. Full write-up: [`absolute-docs/MVP
 | --- | --- | --- |
 | ![Campus map](docs/screenshots/01-campus-map.png) | ![Sample lot selected](docs/screenshots/02-sample-lot-selected.png) | ![Analysis result](docs/screenshots/03-analysis-result.png) |
 
-- **Orange** zones are outdoor lots, **purple** are garages (64 mapped UTD parking areas).
+- **Amber** zones are outdoor lots, **purple** are garages (64 mapped UTD parking areas).
 - Click a zone to inspect it, double-click to reveal individual spaces, or draw a custom polygon.
 - Result panel: occupied / free / uncertain counts, a per-cell list, and the UTD garage-availability feed (PS1, PS3, PS4) shown separately.
+
+## Demo mode (simulated data)
+
+For presentations and screen recordings, the API can run with simulated occupancy so the map shows a realistic mix of occupied and free spaces instead of the all-uncertain result from the historic image.
+
+```bash
+DEMO_MODE=1 python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
+```
+
+- Every space gets a stable occupied / free status (about 72% full) with a confidence score, and a small share of spaces flip every 20 s so the lot looks alive.
+- The UTD garage panel shows moving simulated counts for PS1, PS3 and PS4.
+- The app labels this everywhere it appears: a **Demo mode** tag, a "simulated data" notice and the API field `is_demo: true`. The model is not run in this mode.
+
+| Lot T, full lot | One live update later |
+| --- | --- |
+| ![Demo mode: Lot T with simulated occupied and free spaces](docs/screenshots/05-demo-lot-cells.png) | ![Demo mode: counts and garage numbers after a live update](docs/screenshots/06-demo-live-update.png) |
+
+Recording (34 s, simulated data): [`docs/demo/demo-mode.mp4`](docs/demo/demo-mode.mp4)
 
 ## How it works
 
@@ -64,7 +82,8 @@ flowchart LR
 
 ```
 backend/           FastAPI app: /analyze, /parking-lots, /garage-availability
-frontend/          Next.js + MapLibre GL UI
+frontend/          Next.js + MapLibre GL UI (frontend/kit = vendored Affective UI kit)
+tests/             Unit tests for occupancy logic, demo data and /analyze
 vision/            Detector interface, RT-DETR and stub implementations
 imagery/           ImageryProvider interface, StaticTestProvider
 parking_geometry/  OSM loader, cached UTD lots and spaces
@@ -102,6 +121,19 @@ Open <http://localhost:3000>, click **Load sample lot**, then **Analyze parking 
 | `DETECT_THRESHOLD` | `0.3` | Detection confidence cutoff |
 | `SPOT_CELL_SIZE_M` | `4.0` | Grid cell size for lots without mapped spaces |
 | `DETECTOR_BACKEND` | `rtdetr` | `stub` skips the model download for quick API tests |
+| `DEMO_MODE` | `0` | `1` returns simulated occupancy and garage counts, labelled as demo data |
+
+## Tests
+
+```bash
+python -m unittest discover -s tests -t .
+```
+
+Nine checks cover the occupancy logic (no detections stay uncertain, overlap is occupied), the demo-data generator, and `/analyze` in real and demo mode (219 uncertain cells on the sample lot without detections).
+
+## UI
+
+The frontend uses the Affective UI kit (tokens, `Button`, `StatusTag`, `Notice`, `Progress`, `Skeleton` and its motion recipes), vendored in [`frontend/kit/`](frontend/kit/) so the repo builds without a sibling checkout. Panels ease in, counts animate between values, and map cells fade between states. Reduced-motion settings are respected through the kit's recipes.
 
 ## How we work
 

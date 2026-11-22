@@ -1,14 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import {
-  Button,
-  Card,
-  ProgressBar,
-  Separator,
-  Spinner,
-} from "@heroui/react";
-import { motion } from "framer-motion";
+import { AnimatePresence, animate, motion, useMotionValue, useTransform } from "framer-motion";
+import { Button } from "../kit/Button";
+import { Notice } from "../kit/Notice";
+import { Progress } from "../kit/Progress";
+import { Skeleton } from "../kit/Skeleton";
+import { StatusTag } from "../kit/StatusTag";
 
 type MapLibreMap = import("maplibre-gl").Map;
 type MapLibreDraw = import("maplibre-gl-draw");
@@ -39,6 +37,7 @@ type AnalyzeResponse = {
   imagery_is_current: boolean;
   spots: Spot[];
   detected_vehicles: number;
+  is_demo?: boolean;
   feature_collection: {
     type: "FeatureCollection";
     features: Array<{
@@ -50,7 +49,7 @@ type AnalyzeResponse = {
 };
 
 type GarageAvailability = {
-  source: "live_utd_feed" | "saved_utd_snapshot";
+  source: "live_utd_feed" | "saved_utd_snapshot" | "simulated_demo";
   is_live: boolean;
   fetched_at: string;
   garages: Array<{
@@ -123,6 +122,25 @@ const UTD_SAMPLE_LOT: GeoJSONPolygon = {
     [-96.7546, 32.9927],
   ]],
 };
+
+function AnimatedNumber({ value }: { value: number }) {
+  const motionValue = useMotionValue(value);
+  const text = useTransform(motionValue, (latest) => Math.round(latest).toString());
+  useEffect(() => {
+    const controls = animate(motionValue, value, { duration: 0.24, ease: "linear" });
+    return () => controls.stop();
+  }, [value, motionValue]);
+  return <motion.span>{text}</motion.span>;
+}
+
+function Stat({ label, value, tone }: { label: string; value: number; tone: string }) {
+  return (
+    <div className="rounded-lg border border-border-default bg-sunken px-3 py-2">
+      <div className="font-mono text-label-mono uppercase text-text-muted">{label}</div>
+      <div className={`text-h2 font-medium tabular-nums ${tone}`}><AnimatedNumber value={value} /></div>
+    </div>
+  );
+}
 
 export default function Home() {
   const mapEl = useRef<HTMLDivElement>(null);
@@ -342,9 +360,9 @@ export default function Home() {
     return () => window.removeEventListener("resize", syncViewport);
   }, []);
 
-  const analyze = async (polygon = selectedPolygon) => {
+  const analyze = async (polygon = selectedPolygon, quiet = false) => {
     if (!polygon) return;
-    setLoading(true);
+    if (!quiet) setLoading(true);
     setError(null);
     try {
       const res = await fetch(`${API_URL}/analyze`, {
@@ -364,9 +382,22 @@ export default function Home() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to analyze");
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
     }
   };
+
+  // Demo mode: re-poll so simulated spaces and garage counts keep moving.
+  const isDemo = result?.is_demo || garageAvailability?.source === "simulated_demo";
+  useEffect(() => {
+    if (!isDemo) return;
+    const id = window.setInterval(() => {
+      void loadGarageAvailability();
+      if (result?.is_demo && selectedPolygon) void analyze(selectedPolygon, true);
+    }, 20000);
+    return () => window.clearInterval(id);
+    // analyze only reads setters; the polygon is passed explicitly
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDemo, result?.is_demo, selectedPolygon]);
 
   const total = result?.spots.length ?? 0;
   const occupied = result?.spots.filter((s) => s.occupied === true).length ?? 0;
@@ -423,10 +454,19 @@ export default function Home() {
   const lotPath = (feature: ParkingLotFeature) => polygonPath(feature.geometry);
   const lotBounds = (feature: ParkingLotFeature) => polygonBounds(feature.geometry);
 
+  const cellStatus = (occupiedState: boolean | null) =>
+    occupiedState === true
+      ? { tag: "error", label: "Occupied", fill: "var(--color-error)" }
+      : occupiedState === false
+        ? { tag: "success", label: "Free", fill: "var(--color-success)" }
+        : { tag: "warning", label: "Uncertain", fill: "var(--color-text-muted)" };
+
+  const eyebrow = "font-mono text-label-mono uppercase text-text-muted";
+
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-slate-950">
+    <div className="relative h-screen w-screen overflow-hidden bg-canvas">
       <div ref={mapEl} className="h-full w-full" />
-      <div className="pointer-events-none absolute inset-0 z-0 bg-slate-950/15" />
+      <div className="pointer-events-none absolute inset-0 z-0 bg-canvas/15" />
       {mapViewport.width > 0 && (
         <>
           <svg
@@ -437,14 +477,16 @@ export default function Home() {
           >
             {parkingLots.map((feature) => {
               const isGarage = feature.properties.kind === "garage";
+              const isSelected = selectedLot?.lot_id === feature.properties.lot_id;
               return (
                 <path
                   key={feature.properties.lot_id}
+                  className="cell-path"
                   d={lotPath(feature)}
-                  fill={isGarage ? "#a855f7" : "#fbbf24"}
-                  fillOpacity="0.48"
-                  stroke={isGarage ? "#6d28d9" : "#b45309"}
-                  strokeWidth="3"
+                  fill={isGarage ? "var(--color-series-3)" : "var(--color-warning)"}
+                  fillOpacity={isSelected ? 0.62 : 0.4}
+                  stroke={isGarage ? "var(--color-series-3)" : "var(--color-warning)"}
+                  strokeWidth={isSelected ? 3 : 2}
                 >
                   <title>{`${feature.properties.name} (${isGarage ? "garage" : "outdoor lot"})`}</title>
                 </path>
@@ -476,18 +518,19 @@ export default function Home() {
                 style={{ pointerEvents: "none" }}
               >
                 {slotFeatures.map((slot) => {
-                  const status = slot.properties.occupied === true ? "occupied" : slot.properties.occupied === false ? "free" : "status unavailable";
-                  const color = slot.properties.occupied === true ? "#ef4444" : slot.properties.occupied === false ? "#22c55e" : "#94a3b8";
+                  const status = cellStatus(slot.properties.occupied);
                   return (
                     <path
                       key={slot.properties.spot_id}
+                      className="cell-path"
                       d={polygonPath(slot.geometry)}
-                      fill={color}
-                      fillOpacity="0.7"
-                      stroke="#f8fafc"
+                      fill={status.fill}
+                      fillOpacity={0.72}
+                      stroke="var(--color-text-primary)"
+                      strokeOpacity={0.55}
                       strokeWidth="1"
                     >
-                      <title>{`Space ${slot.properties.spot_id}: ${status}`}</title>
+                      <title>{`Space ${slot.properties.spot_id}: ${status.label}`}</title>
                     </path>
                   );
                 })}
@@ -512,202 +555,206 @@ export default function Home() {
         </>
       )}
 
-      <motion.div
-        initial={{ opacity: 0, y: -12 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="absolute left-6 top-6 z-10 w-[min(360px,calc(100vw-3rem))] max-h-[calc(100vh-3rem)] overflow-y-auto pr-1"
+      <motion.aside
+        initial={{ opacity: 0, x: -12 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.24, ease: "easeOut" }}
+        className="absolute left-6 top-6 z-10 flex max-h-[calc(100vh-3rem)] w-[min(380px,calc(100vw-3rem))] flex-col gap-4 overflow-y-auto rounded-[var(--radius-card)] border border-border-default bg-surface p-5"
       >
-        <Card className="overflow-hidden rounded-md border border-slate-700 bg-slate-950 text-slate-50 shadow-lg shadow-slate-950/50">
-          <Card.Header className="relative flex flex-col items-start gap-3 border-b border-slate-700 bg-slate-900 px-4 py-4">
-            <div className="flex w-full items-center justify-between gap-3">
-              <div className="border-l-2 border-amber-400 pl-3">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">UTD campus</p>
-                <Card.Title className="text-xl font-semibold tracking-tight text-white">Parking map</Card.Title>
-              </div>
-              <span className="border border-emerald-800 bg-emerald-950 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-300">Ready</span>
-            </div>
-            <Card.Description className="text-sm text-slate-300">
-              Click a zone to zoom in; double-click to reveal individual spaces.
-            </Card.Description>
-          </Card.Header>
-          <Card.Content className="flex flex-col gap-3 px-4 py-4">
-            <div className="flex gap-2">
-              <Button
-                variant="primary"
-                onClick={() => void analyze()}
-                isDisabled={!selectedPolygon || loading}
-                className="flex-1 rounded-md bg-blue-600 font-semibold text-white shadow-none hover:bg-blue-500"
-              >
-                {loading ? <Spinner size="sm" /> : "Analyze parking lot"}
-              </Button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedPolygon(UTD_SAMPLE_LOT);
-                  clearSpots();
-                  setError(null);
-                }}
-                className="rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-sm font-medium text-slate-100 transition hover:bg-slate-700"
-              >
-                Load sample lot
-              </button>
-            </div>
+        <header className="flex items-start justify-between gap-3">
+          <div>
+            <p className={eyebrow}>UTD campus</p>
+            <h1 className="mt-1 font-display text-h2 font-medium text-text-primary">Parking map</h1>
+          </div>
+          <StatusTag status={isDemo ? "warning" : "success"}>{isDemo ? "Demo mode" : "Ready"}</StatusTag>
+        </header>
+        <p className="text-small text-text-secondary">Click a zone to zoom in; double-click to reveal individual spaces.</p>
 
-            <div className="grid grid-cols-3 gap-2 border-y border-slate-800 py-3 text-[11px] text-slate-300">
-              <div className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 bg-amber-400" />Outdoor lots</div>
-              <div className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 bg-purple-400" />Garages</div>
-              <div className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 bg-slate-300" />Space grid</div>
-            </div>
+        <div className="flex gap-2">
+          <Button
+            className="flex-1"
+            busy={loading}
+            busyLabel="Analyzing…"
+            disabled={!selectedPolygon}
+            onClick={() => void analyze()}
+          >
+            Analyze parking lot
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setSelectedPolygon(UTD_SAMPLE_LOT);
+              clearSpots();
+              setError(null);
+              const sampleRing = UTD_SAMPLE_LOT.coordinates[0];
+              const lngs = sampleRing.map(([lng]) => lng);
+              const lats = sampleRing.map(([, lat]) => lat);
+              mapRef.current?.fitBounds(
+                [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+                { padding: { top: 96, right: 340, bottom: 96, left: 460 }, maxZoom: 19, duration: 700 },
+              );
+            }}
+          >
+            Load sample lot
+          </Button>
+        </div>
 
-            {selectedLot && (
-              <div className="border-l-2 border-blue-500 bg-slate-900 p-3 text-sm">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-200">Selected zone</p>
-                <p className="mt-1 font-semibold text-white">{selectedLot.name}</p>
-                {selectedLot.kind === "garage" ? (
-                  <p className="mt-1 text-slate-300">
-                    <span className="font-semibold text-emerald-300">{garageAvailability?.garages.find((garage) => garage.id === selectedLot.short_name)?.available_spaces ?? "—"} free</span> spaces in the garage feed.
-                  </p>
-                ) : (
-                  <>
-                    <p className="mt-1 text-slate-300">
-                      Double-click this zone to display its individual spaces. Current occupancy requires fresh aerial imagery.
-                    </p>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      className="mt-2 rounded-md border border-slate-600 bg-slate-800 text-slate-100 hover:bg-slate-700"
-                      onClick={() => {
-                        const feature = parkingLots.find((lot) => lot.properties.lot_id === selectedLot.lot_id);
-                        if (feature) openLotSlots(feature);
-                      }}
-                    >
-                      Show individual spaces
-                    </Button>
-                  </>
-                )}
-              </div>
-            )}
+        <ul className="grid grid-cols-3 gap-2 border-y border-border-default py-3 text-caption text-text-secondary">
+          <li className="flex items-center gap-2"><span className="size-2.5 rounded-[var(--radius-dot)] bg-warning" />Outdoor lots</li>
+          <li className="flex items-center gap-2"><span className="size-2.5 rounded-[var(--radius-dot)] bg-series-3" />Garages</li>
+          <li className="flex items-center gap-2"><span className="size-2.5 rounded-[var(--radius-dot)] bg-text-secondary" />Space grid</li>
+        </ul>
 
-            {selectedSlot && (
-              <div className="border-l-2 border-slate-400 bg-slate-900 p-3 text-sm">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-300">Selected space</p>
-                <p className="mt-1 font-semibold text-white">Space {selectedSlot.spot_id}</p>
-                <p className="mt-1 text-slate-300">
-                  {selectedSlot.occupied === true ? "Occupied" : selectedSlot.occupied === false ? "Free" : "Current status unavailable — the bundled aerial image is historical."}
+        <AnimatePresence initial={false}>
+          {result?.is_demo && (
+            <motion.div key="demo" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+              <Notice tone="warning" title="Demo mode: simulated data" live="status">
+                Occupancy and garage counts are simulated for demonstration. They are not a real detection or a live feed.
+              </Notice>
+            </motion.div>
+          )}
+          {selectedLot && (
+            <motion.div key={`lot-${selectedLot.lot_id}`} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }} className="rounded-lg border border-border-default border-l-2 border-l-border-strong bg-sunken p-3">
+              <p className={eyebrow}>Selected zone</p>
+              <p className="mt-1 text-body-ui font-medium text-text-primary">{selectedLot.name}</p>
+              {selectedLot.kind === "garage" ? (
+                <p className="mt-1 text-small text-text-secondary">
+                  <span className="font-medium text-success">{garageAvailability?.garages.find((garage) => garage.id === selectedLot.short_name)?.available_spaces ?? "—"} free</span> spaces in the garage feed.
                 </p>
-              </div>
-            )}
-
-            <div className="border border-slate-700 bg-slate-900 p-3">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Availability feed</p>
-                  <span className="text-sm font-semibold text-white">UTD garages</span>
-                </div>
-                <Button size="sm" variant="ghost" className="rounded-md text-blue-300 hover:bg-slate-800" onClick={loadGarageAvailability}>
-                  Refresh
-                </Button>
-              </div>
-              {garageAvailability ? (
-                <>
-                  <span className={`inline-flex border px-2 py-1 text-[11px] font-medium ${garageAvailability.is_live ? "border-emerald-800 bg-emerald-950 text-emerald-300" : "border-amber-800 bg-amber-950 text-amber-300"}`}>
-                    {garageAvailability.is_live ? "Live UTD feed" : "Saved UTD snapshot"}
-                  </span>
-                  <div className="mt-3 grid grid-cols-3 gap-2">
-                    {garageAvailability.garages.map((garage) => (
-                      <div key={garage.id} className="border border-slate-700 bg-slate-950 px-2 py-2 text-center">
-                        <div className="text-xs font-medium text-slate-400">{garage.id}</div>
-                        <div className="mt-0.5 font-semibold text-emerald-300">{garage.available_spaces} free</div>
-                      </div>
-                    ))}
-                  </div>
-                </>
               ) : (
-                <span className="text-xs text-default-500">Loading official garage availability…</span>
-              )}
-              {garageError && <p className="mt-2 text-xs text-danger">{garageError}</p>}
-            </div>
-
-            {error && (
-              <span className="border border-rose-800 bg-rose-950 px-2 py-1 text-xs text-rose-200">
-                {error}
-              </span>
-            )}
-
-            <Separator className="bg-slate-700" />
-
-            {result ? (
-              <div className="grid grid-cols-2 gap-2 border border-slate-700 bg-slate-900 p-2 text-xs font-medium">
-                <span className="border border-rose-800 bg-rose-950 px-2 py-1.5 text-rose-200">{occupied} occupied</span>
-                <span className="border border-emerald-800 bg-emerald-950 px-2 py-1.5 text-emerald-200">{free} free</span>
-                <span className="border border-slate-600 bg-slate-800 px-2 py-1.5 text-slate-200">{total} spaces</span>
-                {uncertain > 0 && (
-                  <span className="border border-slate-600 bg-slate-800 px-2 py-1.5 text-slate-200">{uncertain} uncertain</span>
-                )}
-              </div>
-            ) : (
-              <div className="border-l-2 border-amber-500 bg-slate-900 px-3 py-2 text-xs text-slate-300">
-                <span className="font-semibold text-amber-300">Tip:</span> click a colored zone to inspect it, or draw a custom parking area.
-              </div>
-            )}
-
-            {total > 0 && (
-              <ProgressBar
-                value={occupancyRate}
-                color="danger"
-                aria-label="Occupancy"
-                className="w-full"
-              >
-                <ProgressBar.Output>{occupancyRate}% occupied</ProgressBar.Output>
-                <ProgressBar.Track>
-                  <ProgressBar.Fill />
-                </ProgressBar.Track>
-              </ProgressBar>
-            )}
-
-            {result?.detected_vehicles === 0 && total > 0 && (
-              <p className="text-xs text-warning">
-                No vehicles were detected in this historic image, so the space labels are uncertain rather than marked free.
-              </p>
-            )}
-          </Card.Content>
-        </Card>
-      </motion.div>
-
-      {result && (
-        <motion.div
-          initial={{ opacity: 0, x: 12 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="absolute right-6 top-6 z-10 w-[min(300px,calc(100vw-3rem))] max-h-[60vh]"
-        >
-          <Card className="h-full overflow-hidden rounded-md border border-slate-700 bg-slate-950 text-slate-50 shadow-lg shadow-slate-950/50">
-            <Card.Header className="border-b border-slate-700 bg-slate-900 px-4 py-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Space analysis</p>
-              <Card.Title className="text-base text-white">Individual parking cells</Card.Title>
-            </Card.Header>
-            <Card.Content className="overflow-y-auto px-3 py-3">
-              <div className="flex flex-col gap-2">
-                {result.spots.slice(0, 80).map((spot) => (
-                  <div
-                    key={spot.id}
-                    className="flex items-center justify-between border border-slate-700 bg-slate-900 px-3 py-2"
+                <>
+                  <p className="mt-1 text-small text-text-secondary">
+                    Double-click this zone to display its individual spaces.
+                    {!result?.is_demo && " Current occupancy requires fresh aerial imagery."}
+                  </p>
+                  <Button
+                    variant="secondary"
+                    className="mt-3 !min-h-9 !px-3 !py-1"
+                    onClick={() => {
+                      const feature = parkingLots.find((lot) => lot.properties.lot_id === selectedLot.lot_id);
+                      if (feature) openLotSlots(feature);
+                    }}
                   >
-                    <span className="font-mono text-xs text-slate-400">
-                      {spot.id}
-                    </span>
-                    <span className={`border px-2 py-1 text-[11px] font-medium ${spot.occupied === true ? "border-rose-800 bg-rose-950 text-rose-200" : spot.occupied === false ? "border-emerald-800 bg-emerald-950 text-emerald-200" : "border-slate-600 bg-slate-800 text-slate-300"}`}>
-                      {spot.occupied === true ? "Occupied" : spot.occupied === false ? "Free" : "Uncertain"}
-                    </span>
+                    Show individual spaces
+                  </Button>
+                </>
+              )}
+            </motion.div>
+          )}
+          {selectedSlot && (
+            <motion.div key={`slot-${selectedSlot.spot_id}`} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }} className="rounded-lg border border-border-default border-l-2 border-l-border-strong bg-sunken p-3">
+              <p className={eyebrow}>Selected space</p>
+              <p className="mt-1 text-body-ui font-medium text-text-primary">Space {selectedSlot.spot_id}</p>
+              <p className="mt-1 text-small text-text-secondary">
+                {selectedSlot.occupied === null
+                  ? "Current status unavailable. The bundled aerial image is historical."
+                  : `${cellStatus(selectedSlot.occupied).label}${selectedSlot.confidence ? ` · ${Math.round(selectedSlot.confidence * 100)}% confidence` : ""}`}
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <section className="rounded-lg border border-border-default bg-sunken p-3">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div>
+              <p className={eyebrow}>Availability feed</p>
+              <p className="text-body-ui font-medium text-text-primary">UTD garages</p>
+            </div>
+            <Button variant="quiet" className="!min-h-9 !px-3 !py-1 text-data" onClick={loadGarageAvailability}>
+              Refresh
+            </Button>
+          </div>
+          {garageAvailability ? (
+            <>
+              <StatusTag status={garageAvailability.is_live ? "success" : "warning"}>
+                {garageAvailability.source === "simulated_demo" ? "Simulated demo data" : garageAvailability.is_live ? "Live UTD feed" : "Saved UTD snapshot"}
+              </StatusTag>
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {garageAvailability.garages.map((garage) => (
+                  <div key={garage.id} className="rounded-lg border border-border-default bg-surface px-2 py-2 text-center">
+                    <div className="text-caption font-medium text-text-muted">{garage.id}</div>
+                    <div className="mt-0.5 text-body-ui font-medium tabular-nums text-success"><AnimatedNumber value={garage.available_spaces} /> free</div>
                   </div>
                 ))}
-                {result.spots.length > 80 && (
-                  <p className="px-2 py-1 text-center text-xs text-slate-400">Showing the first 80 of {result.spots.length} spaces. Zoom in and select a cell on the map for details.</p>
-                )}
               </div>
-            </Card.Content>
-          </Card>
-        </motion.div>
-      )}
+            </>
+          ) : (
+            <div role="status" aria-label="Loading garage availability" className="grid grid-cols-3 gap-2">
+              <Skeleton className="h-14" /><Skeleton className="h-14" /><Skeleton className="h-14" />
+            </div>
+          )}
+          {garageError && <p className="mt-2 text-small text-error">{garageError}</p>}
+        </section>
+
+        {error && <Notice tone="error" title="Something went wrong" live="alert">{error}</Notice>}
+
+        {result ? (
+          <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-2 gap-2">
+              <Stat label="Occupied" tone="text-error" value={occupied} />
+              <Stat label="Free" tone="text-success" value={free} />
+              <Stat label="Spaces" tone="text-text-primary" value={total} />
+              {uncertain > 0 && <Stat label="Uncertain" tone="text-warning" value={uncertain} />}
+            </div>
+            {total > 0 && <Progress label="Occupancy" value={occupancyRate} />}
+            {result.detected_vehicles === 0 && total > 0 && (
+              <Notice tone="warning" title="No vehicles detected">
+                The historic image shows no detectable vehicles, so space labels are uncertain rather than marked free.
+              </Notice>
+            )}
+          </div>
+        ) : (
+          <Notice tone="data" title="Tip">Click a colored zone to inspect it, or draw a custom parking area.</Notice>
+        )}
+      </motion.aside>
+
+      <AnimatePresence>
+        {(result || loading) && (
+          <motion.aside
+            key="cells"
+            initial={{ opacity: 0, x: 12 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 12 }}
+            transition={{ duration: 0.24, ease: "easeOut" }}
+            className="absolute right-6 top-6 z-10 flex max-h-[60vh] w-[min(300px,calc(100vw-3rem))] flex-col overflow-hidden rounded-[var(--radius-card)] border border-border-default bg-surface"
+          >
+            <header className="border-b border-border-default bg-sunken px-4 py-3">
+              <p className={eyebrow}>Space analysis</p>
+              <h2 className="text-body-ui font-medium text-text-primary">Individual parking cells</h2>
+            </header>
+            <div className="overflow-y-auto px-3 py-3">
+              {result ? (
+                <ul className="flex flex-col gap-2">
+                  {result.spots.slice(0, 80).map((spot, index) => {
+                    const status = cellStatus(spot.occupied);
+                    return (
+                      <motion.li
+                        key={spot.id}
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.18, delay: Math.min(index, 14) * 0.02 }}
+                        className="flex items-center justify-between rounded-lg border border-border-default bg-sunken px-3 py-2"
+                      >
+                        <span className="font-mono text-caption text-text-muted">{spot.id}</span>
+                        <StatusTag status={status.tag} className="!px-2 !py-0.5">{status.label}</StatusTag>
+                      </motion.li>
+                    );
+                  })}
+                  {result.spots.length > 80 && (
+                    <li className="px-2 py-1 text-center text-caption text-text-muted">
+                      Showing the first 80 of {result.spots.length} spaces. Zoom in and select a cell on the map for details.
+                    </li>
+                  )}
+                </ul>
+              ) : (
+                <div role="status" aria-label="Analyzing parking lot" className="flex flex-col gap-2">
+                  {Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-11" />)}
+                </div>
+              )}
+            </div>
+          </motion.aside>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

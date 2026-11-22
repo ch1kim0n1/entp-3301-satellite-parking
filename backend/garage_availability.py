@@ -9,6 +9,9 @@ from pathlib import Path
 
 import requests
 
+from backend.config import DEMO_MODE
+from backend.demo import demo_garages
+
 ROOT = Path(__file__).resolve().parents[1]
 LIVE_GARAGE_URL = "https://services.utdallas.edu/transit/garages/_code.php/"
 SNAPSHOT_PATH = ROOT / "UTD-resources" / "garage_availability.json"
@@ -96,6 +99,11 @@ def _load_snapshot():
 
 def get_garage_availability():
     """Return live public data when available, otherwise the labeled snapshot."""
+    if DEMO_MODE:
+        return _payload(
+            {g: [{"level": 1, "option": "demo", "available_spaces": n}] for g, n in demo_garages().items()},
+            source="simulated_demo",
+        )
     try:
         response = requests.get(LIVE_GARAGE_URL, timeout=5)
         response.raise_for_status()

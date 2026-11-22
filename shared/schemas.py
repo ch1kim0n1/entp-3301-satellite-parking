@@ -24,3 +24,4 @@ class AnalyzeResponse(BaseModel):
     spots: list[Spot]
     feature_collection: dict
     detected_vehicles: int = 0
+    is_demo: bool = False

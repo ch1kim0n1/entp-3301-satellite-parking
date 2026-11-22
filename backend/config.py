@@ -10,3 +10,5 @@ MODEL_NAME = os.environ.get("MODEL_NAME", "PekingU/rtdetr_r50vd")
 DETECT_THRESHOLD = float(os.environ.get("DETECT_THRESHOLD", "0.3"))
 SPOT_CELL_SIZE_M = float(os.environ.get("SPOT_CELL_SIZE_M", "4.0"))
 DETECTOR_BACKEND = os.environ.get("DETECTOR_BACKEND", "rtdetr")
+
+DEMO_MODE = os.environ.get("DEMO_MODE", "0") == "1"

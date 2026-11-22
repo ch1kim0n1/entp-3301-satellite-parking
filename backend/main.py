@@ -7,12 +7,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from shapely.geometry import box, mapping, shape
 
 from backend.config import (
+    DEMO_MODE,
     DETECT_THRESHOLD,
     DETECTOR_BACKEND,
     MODEL_NAME,
     SPOT_CELL_SIZE_M,
     TEST_IMAGE_PATH,
 )
+from backend.demo import DEMO_SOURCE, demo_occupancy
 from backend.garage_availability import get_garage_availability
 from imagery.provider import StaticTestProvider
 from parking_geometry.loader import load_cached_parking_lots, load_parking_areas
@@ -108,8 +110,8 @@ def analyze(req: AnalyzeRequest):
         if image.shape[-1] == 4:
             image = image[..., :3]
 
-        detector = _get_detector()
-        detections = detector.detect(image)
+        # ponytail: demo mode skips the model entirely and simulates per-space status
+        detections = [] if DEMO_MODE else _get_detector().detect(image)
         det_polys = []
         for d in detections:
             xmin, ymin, xmax, ymax = d["bbox"]
@@ -122,7 +124,10 @@ def analyze(req: AnalyzeRequest):
         for spot in spots:
             spot_geom_wgs84 = spot["polygon"]
             spot_pixel = wgs84_geom_to_pixel_geom(spot_geom_wgs84, src)
-            occupied, confidence = _is_occupied(spot_pixel, det_polys)
+            if DEMO_MODE:
+                occupied, confidence = demo_occupancy(spot["id"])
+            else:
+                occupied, confidence = _is_occupied(spot_pixel, det_polys)
             out_spots.append(
                 {
                     "id": spot["id"],
@@ -136,10 +141,11 @@ def analyze(req: AnalyzeRequest):
             capture_time=None,
             analyzed_at=datetime.now(timezone.utc).isoformat(),
             image_id="utd_naip_plus_historic",
-            imagery_source="Bundled USGS NAIP aerial GeoTIFF",
+            imagery_source=DEMO_SOURCE if DEMO_MODE else "Bundled USGS NAIP aerial GeoTIFF",
             imagery_is_current=False,
             spots=out_spots,
-            detected_vehicles=len(detections),
+            detected_vehicles=sum(s["occupied"] is True for s in out_spots) if DEMO_MODE else len(detections),
+            is_demo=DEMO_MODE,
             feature_collection={
                 "type": "FeatureCollection",
                 "features": [

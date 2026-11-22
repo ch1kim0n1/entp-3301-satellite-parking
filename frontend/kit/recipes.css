@@ -1,0 +1,307 @@
+/* Named motion patterns. Keep crisis surfaces static and data movement linear. */
+:root {
+  --motion-fast: 120ms;
+  --motion-base: 180ms;
+  --motion-panel: 240ms;
+  --motion-overlay: var(--motion-panel);
+  --motion-exit: 160ms;
+  --motion-loop: 1.6s;
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-standard: cubic-bezier(0.2, 0, 0.2, 1);
+  --motion-rise: calc(var(--space-2) - var(--radius-dot));
+}
+
+@keyframes mc-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes mc-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes mc-rise {
+  from { opacity: 0; transform: translateY(var(--motion-rise)); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.state-marker-enter,
+.tab-reveal:not([hidden]) {
+  animation: mc-fade-in var(--motion-base) var(--ease-out) both;
+}
+
+.message-enter,
+.notice-enter {
+  animation: mc-rise var(--motion-base) var(--ease-out) both;
+}
+
+.panel-expand {
+  --motion-rise: var(--space-1);
+  animation: mc-rise var(--motion-panel) var(--ease-out) both;
+}
+
+.overlay-enter { animation: mc-fade-in var(--motion-overlay) var(--ease-out) both; }
+.overlay-exit { animation: mc-fade-out var(--motion-exit) var(--ease-in) forwards; }
+
+.interactive-surface,
+.field-feedback,
+.button-press {
+  transition-property: background-color, border-color, color, text-decoration-color;
+  transition-duration: var(--motion-fast);
+  transition-timing-function: var(--ease-standard);
+}
+
+.artwork-feedback { transition: opacity var(--motion-base) var(--ease-standard); }
+
+.button-press {
+  transition-property: background-color, border-color, color, transform;
+}
+
+.button-press:not(:disabled):not([aria-disabled="true"]):active {
+  transform: translateY(1px);
+}
+
+.control-indicator,
+.disclosure-chevron {
+  transition: transform var(--motion-base) var(--ease-standard), opacity var(--motion-fast) var(--ease-standard);
+}
+
+.disclosure-trigger[aria-expanded="true"] .disclosure-chevron { transform: rotate(180deg); }
+
+.disclosure-reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  visibility: hidden;
+  transition: grid-template-rows var(--motion-exit) var(--ease-in),
+    opacity var(--motion-exit) var(--ease-in),
+    visibility 0s var(--motion-exit);
+}
+
+.disclosure-reveal[data-expanded="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  visibility: visible;
+  transition-duration: var(--motion-base), var(--motion-base), 0s;
+  transition-delay: 0s;
+  transition-timing-function: var(--ease-out);
+}
+
+.disclosure-reveal > div { min-block-size: 0; overflow: hidden; }
+
+.pointer-glide {
+  transition: transform var(--motion-panel) var(--ease-out);
+}
+
+/* Native dialogs own focus and the top layer. Browsers without discrete
+   transitions still open and close the same accessible dialog. */
+.kit-dialog {
+  --dialog-travel: translateY(var(--space-2));
+  opacity: 0;
+  transform: var(--dialog-travel);
+  transition: opacity var(--motion-exit) var(--ease-in),
+    transform var(--motion-exit) var(--ease-in);
+  transition: opacity var(--motion-exit) var(--ease-in),
+    transform var(--motion-exit) var(--ease-in),
+    display var(--motion-exit) allow-discrete, overlay var(--motion-exit) allow-discrete;
+}
+
+.kit-dialog[data-placement="start"] { --dialog-travel: translateX(calc(-1 * var(--space-5))); }
+.kit-dialog[data-placement="end"] { --dialog-travel: translateX(var(--space-5)); }
+.kit-dialog[data-placement="bottom"] { --dialog-travel: translateY(var(--space-5)); }
+.kit-dialog:dir(rtl)[data-placement="start"] { --dialog-travel: translateX(var(--space-5)); }
+.kit-dialog:dir(rtl)[data-placement="end"] { --dialog-travel: translateX(calc(-1 * var(--space-5))); }
+
+.kit-dialog[open] {
+  opacity: 1;
+  transform: none;
+  transition-duration: var(--motion-panel);
+  transition-timing-function: var(--ease-out);
+}
+
+.kit-dialog::backdrop {
+  background-color: var(--color-scrim);
+  opacity: 0;
+  transition: opacity var(--motion-exit) var(--ease-in);
+  transition: opacity var(--motion-exit) var(--ease-in),
+    display var(--motion-exit) allow-discrete, overlay var(--motion-exit) allow-discrete;
+}
+
+.kit-dialog[open]::backdrop {
+  opacity: 1;
+  transition-duration: var(--motion-overlay);
+  transition-timing-function: var(--ease-out);
+}
+
+@starting-style {
+  .kit-dialog[open] { opacity: 0; transform: var(--dialog-travel); }
+  .kit-dialog[open]::backdrop { opacity: 0; }
+}
+
+html:has(.kit-dialog[open]) { overflow: hidden; }
+
+.toast-enter {
+  display: none;
+  opacity: 0;
+  transform: translateY(var(--motion-rise));
+  transition: opacity var(--motion-exit) var(--ease-in),
+    transform var(--motion-exit) var(--ease-in), display var(--motion-exit) allow-discrete;
+}
+
+.toast-enter[data-open="true"] {
+  display: flex;
+  opacity: 1;
+  transform: none;
+  transition-duration: var(--motion-base);
+  transition-timing-function: var(--ease-out);
+}
+
+@starting-style {
+  .toast-enter[data-open="true"] { opacity: 0; transform: translateY(var(--motion-rise)); }
+}
+
+.skeleton-pulse { animation: mc-skeleton-pulse var(--motion-loop) ease-in-out infinite; }
+@keyframes mc-skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+.busy-indicator { animation: mc-busy-spin calc(var(--motion-loop) / 2) linear infinite; }
+@keyframes mc-busy-spin { to { transform: rotate(360deg); } }
+
+.progress-update { transition: transform var(--motion-panel) linear; }
+.progress-indeterminate { animation: mc-progress-slide var(--motion-loop) var(--ease-standard) infinite; }
+@keyframes mc-progress-slide {
+  from { transform: translateX(var(--progress-start, -100%)); }
+  to { transform: translateX(var(--progress-end, 300%)); }
+}
+.progress-indeterminate:dir(rtl) { --progress-start: 100%; --progress-end: -300%; }
+
+.notebook-parallax { will-change: transform; }
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+    --motion-base: 0ms;
+    --motion-panel: 0ms;
+    --motion-exit: 0ms;
+  }
+  .state-marker-enter, .message-enter, .notice-enter, .panel-expand, .tab-reveal,
+  .overlay-enter, .overlay-exit, .skeleton-pulse, .busy-indicator, .progress-indeterminate {
+    animation: none;
+  }
+  .button-press:not(:disabled):not([aria-disabled="true"]):active { transform: none; }
+  .notebook-parallax { transform: none !important; will-change: auto; }
+  * { transition-duration: 0ms !important; }
+}
+
+.choice-input:focus-visible + .choice-mark {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.choice-input:is(:checked, :indeterminate) + .choice-mark {
+  background-color: var(--color-text-primary);
+  border-color: var(--color-text-primary);
+  color: var(--color-canvas);
+}
+
+.choice-input:disabled + .choice-mark {
+  background-color: var(--color-disabled-surface);
+  border-color: var(--color-border-control);
+  color: var(--color-disabled-text);
+}
+
+.choice-check, .choice-mixed { opacity: 0; transform: scale(0.75); }
+.choice-input:checked:not(:indeterminate) + .choice-mark .choice-check,
+.choice-input:indeterminate + .choice-mark .choice-mixed { opacity: 1; transform: none; }
+.choice-input:checked + .switch-track .switch-thumb {
+  background-color: var(--color-canvas);
+  transform: translateX(calc(var(--space-4) - var(--radius-dot)));
+}
+.choice-input:checked:dir(rtl) + .switch-track .switch-thumb {
+  transform: translateX(calc(var(--radius-dot) - var(--space-4)));
+}
+.choice-input:disabled + .switch-track .switch-thumb { background-color: var(--color-disabled-text); }
+@media (forced-colors: active) {
+  .choice-input:is(:checked, :indeterminate) + .choice-mark {
+    forced-color-adjust: none;
+    background-color: Highlight;
+    border-color: Highlight;
+    color: HighlightText;
+  }
+  .choice-input + .switch-track .switch-thumb { background-color: ButtonText; }
+  .choice-input:checked + .switch-track .switch-thumb { background-color: HighlightText; }
+  .choice-input:disabled + .choice-mark { border-color: GrayText; }
+}
+
+/* Floating placement comes from the anchor engine, including collision flips. */
+.anchored-popup {
+  transform-origin: var(--transform-origin);
+  transition: opacity var(--motion-base) var(--ease-out), scale var(--motion-base) var(--ease-out);
+}
+
+.anchored-popup[data-starting-style],
+.anchored-popup[data-ending-style] {
+  opacity: 0;
+  scale: 0.97;
+}
+
+.anchored-popup[data-ending-style] {
+  transition-duration: var(--motion-fast);
+  transition-timing-function: var(--ease-in);
+}
+
+.anchored-popup[data-instant] { transition: none; }
+
+.drawer-scrim {
+  opacity: 1;
+  transition: opacity var(--motion-panel) var(--ease-out);
+}
+.drawer-scrim[data-swiping] { opacity: max(0.25, calc(1 - var(--drawer-swipe-progress, 0))); }
+.drawer-scrim[data-starting-style], .drawer-scrim[data-ending-style] { opacity: 0; }
+.drawer-scrim[data-ending-style] { transition-duration: var(--motion-exit); }
+
+.gesture-drawer {
+  --drawer-offset: calc(var(--drawer-snap-point-offset, 0px) + var(--drawer-swipe-movement-y, 0px));
+  padding-block-end: calc(max(0px, var(--drawer-offset)) + env(safe-area-inset-bottom, 0px));
+  transform: translateY(var(--drawer-offset));
+  transition: transform var(--motion-panel) var(--ease-out), padding-block-end var(--motion-panel) var(--ease-out);
+}
+.gesture-drawer[data-starting-style], .gesture-drawer[data-ending-style] {
+  padding-block-end: 0;
+  transform: translateY(100%);
+}
+.gesture-drawer[data-ending-style] {
+  transition-duration: calc(var(--motion-panel) * var(--drawer-swipe-strength, 0.67));
+  transition-timing-function: var(--ease-in);
+}
+.gesture-drawer[data-swiping], .drawer-scrim[data-swiping] { transition: none; }
+.drawer-footer:focus-within { translate: 0 calc(-1 * var(--drawer-keyboard-inset, 0px)); }
+
+.notification {
+  transform: translateX(var(--toast-swipe-movement-x, 0px));
+  transition: opacity var(--motion-base) var(--ease-out), transform var(--motion-base) var(--ease-out);
+}
+.notification[data-starting-style] { opacity: 0; transform: translateY(var(--motion-rise)); }
+.notification[data-ending-style] { opacity: 0; transition-duration: var(--motion-fast); }
+.notification[data-ending-style][data-swipe-direction="left"] { transform: translateX(-100%); }
+.notification[data-ending-style][data-swipe-direction="right"] { transform: translateX(100%); }
+.notification[data-swiping] { transition: none; }
+.notification[data-limited] { display: none; }
+
+.tab-indicator {
+  width: var(--active-tab-width);
+  translate: var(--active-tab-left) 0;
+  transition: translate var(--motion-base) var(--ease-standard), width var(--motion-base) var(--ease-standard), height var(--motion-base) var(--ease-standard);
+}
+.tab-indicator[data-orientation="vertical"] {
+  width: var(--radius-dot);
+  height: var(--active-tab-height);
+  translate: 0 var(--active-tab-top);
+}
+
+/* Intermediate theme colors can put text and its background at the same luminance. */
+[data-theme-changing], [data-theme-changing] * { transition-duration: 0ms !important; }
