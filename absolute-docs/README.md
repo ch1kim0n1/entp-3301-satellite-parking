@@ -20,6 +20,7 @@ A map-based application where a user selects a parking area on a MapLibre map, t
 - `API.md` — request/response contracts
 - `COORDINATES.md` — satellite image ↔ geographic coordinate math
 - `ROADMAP.md` — suggested build order
+- `MVP_RESULTS.md` — final MVP demonstration data and screenshots
 
 ## License / attribution
 
