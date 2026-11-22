@@ -7,7 +7,7 @@ Final project data from the MVP demonstration (November 19) of the static-image 
 | Metric | Result |
 | --- | --- |
 | Lots analyzed | 1 sample lot |
-| Imagery | Historical USGS NAIP aerial image (`UTD-resources/utd_naip_plus.tif`, 4000 × 4000 px, ~0.66 m/px, EPSG:3857) |
+| Imagery | Historical USGS NAIP aerial image (`UTD-resources/utd_naip_plus.tif`, 4000 × 4000 px, ~0.56 m/px on the ground, EPSG:3857) |
 | Grid cells analyzed | 219 |
 | Processing time | 15.3 s, including initial model loading |
 | Detector | RT-DETR (`PekingU/rtdetr_r50vd`), confidence threshold 0.3 |
@@ -24,6 +24,15 @@ Final project data from the MVP demonstration (November 19) of the static-image 
 4. **No ground-truth labels or formal detection-accuracy results are available.**
 5. **Live parking availability, rerouting, walking-time accuracy, and actual time savings have not been validated.** Spot-level directions and fastest-route are post-MVP items in [`ROADMAP.md`](ROADMAP.md). The garage-availability panel is a separate UTD feed, not part of the vision pipeline.
 6. **The ≥90% accuracy and ≤2% false-open thresholds are proposed targets, not achieved results.**
+
+## Test conditions and limitations
+
+- **Run date and setup:** run locally on 2026-11-19. The sample lot was loaded on the map and **Analyze** was clicked. The backend loaded the bundled aerial image, split the lot into 4 m grid cells, ran RT-DETR (confidence threshold 0.3), and labeled each cell.
+- **Imagery:** one bundled USGS NAIP image. The capture date is not documented, so it says nothing about current conditions.
+- **Resolution:** about 0.56 m per pixel on the ground, so a 4.5 m car is roughly 8 pixels long. The cause of the zero detections is not confirmed; image resolution and the 0.3 threshold are the first things to test.
+- **Cells are not marked spaces:** the repo maps only 14 individual parking spaces, so lots are divided into a 4 m grid.
+- **Garage panel:** it showed a saved UTD snapshot, because the live UTD feed was not reachable during the demo run.
+- **Not conducted:** detection-accuracy test, live-imagery test, live-data access check, walking-time check, usability test, time-savings test.
 
 ## Demonstration screenshots
 

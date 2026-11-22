@@ -11,7 +11,7 @@ Results of the November 19 MVP demonstration. Full write-up: [`absolute-docs/MVP
 | | |
 | --- | --- |
 | Lots analyzed | **1** sample lot |
-| Imagery | Historical USGS NAIP aerial (4000 × 4000 px, ~0.66 m/px) |
+| Imagery | Historical USGS NAIP aerial (4000 × 4000 px, ~0.56 m/px on the ground) |
 | Grid cells processed | **219** |
 | Processing time | **15.3 s** including initial model load |
 | Vehicles detected | **0** |
